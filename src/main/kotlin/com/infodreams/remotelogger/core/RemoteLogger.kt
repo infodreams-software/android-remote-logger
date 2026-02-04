@@ -192,15 +192,15 @@ class RemoteLogger private constructor() {
         if (!isInitialized || !isEnabled || currentSession == null) return
 
         scope.launch {
-            val file = storage?.getSessionFile()
-            if (file != null && file.exists()) {
-                try {
+            try {
+                val file = storage?.getSessionFile()
+                if (file != null && file.exists()) {
                     uploader?.uploadSession(file, currentSession!!, remotePath)
                     notifyEvent(RemoteLoggerEvent.Success("Session uploaded successfully", file.absolutePath))
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to upload session", e)
-                    notifyEvent(RemoteLoggerEvent.Error("Failed to upload session", e))
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to upload session", e)
+                notifyEvent(RemoteLoggerEvent.Error("Failed to upload session", e))
             }
         }
     }

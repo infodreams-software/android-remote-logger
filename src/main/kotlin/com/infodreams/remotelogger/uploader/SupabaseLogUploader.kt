@@ -5,7 +5,14 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 
 import io.github.jan.supabase.storage.storage
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.coroutines.CoroutineScope
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
@@ -41,15 +48,19 @@ class SupabaseLogUploader(
             val startTimeIso = toIso8601(sessionInfo.startTime)
             val uploadTimeIso = toIso8601(System.currentTimeMillis())
 
-            val row = mapOf(
-                "session_id" to sessionInfo.sessionId,
-                "device_id" to sessionInfo.deviceId,
-                "start_time" to startTimeIso,
-                "user_id" to sessionInfo.userId,
-                "custom_data" to sessionInfo.deviceMetadata,
-                "log_file_url" to logFileUrl,
-                "uploaded_at" to uploadTimeIso
-            )
+            // Use JsonObject because Map<String, Any> is not serializable by kotlinx.serialization
+            val row = buildJsonObject {
+                put("session_id", sessionInfo.sessionId)
+                put("device_id", sessionInfo.deviceId)
+                put("start_time", startTimeIso)
+                put("user_id", sessionInfo.userId)
+                put("log_file_url", logFileUrl)
+                put("uploaded_at", uploadTimeIso)
+                
+                // Convert Map<String, Any> to JsonObject for custom_data
+                val metadataJson = sessionInfo.deviceMetadata.toJsonElement()
+                put("custom_data", metadataJson)
+            }
 
             supabase.postgrest.from(sessionsTable).upsert(row)
         } catch (e: Exception) {
@@ -59,11 +70,12 @@ class SupabaseLogUploader(
 
     override suspend fun identifyUser(deviceId: String, userId: String) {
         try {
-            val row = mapOf(
-                "device_id" to deviceId,
-                "user_id" to userId,
-                "linked_at" to toIso8601(System.currentTimeMillis())
-            )
+            // Map<String, String> works fine, but let's be consistent
+            val row = buildJsonObject {
+                put("device_id", deviceId)
+                put("user_id", userId)
+                put("linked_at", toIso8601(System.currentTimeMillis()))
+            }
             supabase.postgrest.from(deviceLinksTable).insert(row)
         } catch (e: Exception) {
             android.util.Log.e("SupabaseLogUploader", "Identify User failed", e)
@@ -90,5 +102,30 @@ class SupabaseLogUploader(
         val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US)
         dateFormat.timeZone = TimeZone.getTimeZone("UTC")
         return dateFormat.format(Date(timestamp))
+    }
+
+    // Helper to convert Any? to JsonElement
+    private fun Any?.toJsonElement(): JsonElement {
+        return when (this) {
+            null -> kotlinx.serialization.json.JsonNull
+            is Boolean -> JsonPrimitive(this)
+            is Number -> JsonPrimitive(this)
+            is String -> JsonPrimitive(this)
+            is Map<*, *> -> {
+                buildJsonObject {
+                    for ((k, v) in this@toJsonElement) {
+                        put(k.toString(), v.toJsonElement())
+                    }
+                }
+            }
+            is List<*> -> {
+                kotlinx.serialization.json.buildJsonArray {
+                    for (item in this@toJsonElement) {
+                        add(item.toJsonElement())
+                    }
+                }
+            }
+            else -> JsonPrimitive(this.toString()) // Fallback
+        }
     }
 }
