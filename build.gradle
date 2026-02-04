@@ -50,6 +50,11 @@ dependencies {
     // Supabase (compileOnly)
     compileOnly 'io.github.jan-tennert.supabase:storage-kt:2.5.0'
     compileOnly 'io.github.jan-tennert.supabase:postgrest-kt:2.5.0'
+
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
+    testImplementation "io.mockk:mockk:1.13.8"
 }
 
 afterEvaluate {

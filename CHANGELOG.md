@@ -1,3 +1,7 @@
+## 0.1.1
+* **Docs**: Updated documentation to reflect cross-platform consistency.
+* **Tests**: Added initial unit verification for `DeviceInfoProvider` using JUnit and MockK.
+
 ## 0.1.0
 * **Initial Release**: Ported core functionality from `flutter-remote-logger` v0.3.0.
 * **Persistent Device ID**: Uses `Settings.Secure.ANDROID_ID`.
