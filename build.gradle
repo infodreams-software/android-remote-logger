@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.infodreams.remotelogger'
-version = '0.1.0'
+version = '0.1.1'
 
 ext.kotlin_version = '1.9.0'
 
@@ -64,7 +64,7 @@ afterEvaluate {
                 from components.release
                 groupId = 'com.github.infodreams-software'
                 artifactId = 'android-remote-logger'
-                version = '0.1.0'
+                version = '0.1.1'
             }
         }
     }
