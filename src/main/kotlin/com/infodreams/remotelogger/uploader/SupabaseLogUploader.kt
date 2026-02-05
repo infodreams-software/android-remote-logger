@@ -62,9 +62,12 @@ class SupabaseLogUploader(
                 put("custom_data", metadataJson)
             }
 
-            supabase.postgrest.from(sessionsTable).upsert(row)
+            supabase.postgrest.from(sessionsTable).upsert(row) {
+                // Force return type to avoid Any serialization issues?
+                // Actually upsert just takes the object.
+            }
         } catch (e: Exception) {
-            android.util.Log.e("SupabaseLogUploader", "Upload failed", e)
+            android.util.Log.e("SupabaseLogUploader", "Upload failed for session ${sessionInfo.sessionId}: ${e.message}", e)
         }
     }
 

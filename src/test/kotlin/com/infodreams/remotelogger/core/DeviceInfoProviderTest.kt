@@ -1,57 +1,51 @@
 package com.infodreams.remotelogger.core
 
-import android.content.ContentResolver
 import android.content.Context
-import android.provider.Settings
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkAll
-import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import java.io.File
 
 class DeviceInfoProviderTest {
 
+    @get:Rule
+    val tempFolder = TemporaryFolder()
+
     private lateinit var context: Context
-    private lateinit var contentResolver: ContentResolver
     private lateinit var deviceInfoProvider: DeviceInfoProvider
+    private lateinit var filesDir: File
 
     @Before
     fun setUp() {
         context = mockk()
-        contentResolver = mockk()
-        every { context.contentResolver } returns contentResolver
+        filesDir = tempFolder.newFolder("files")
+        every { context.filesDir } returns filesDir
         deviceInfoProvider = DeviceInfoProvider(context)
     }
 
-    @After
-    fun tearDown() {
-        unmockkAll()
+    @Test
+    fun `getDeviceId creates new ID if file missing`() {
+        val deviceId = deviceInfoProvider.getDeviceId()
+        assertTrue(deviceId.isNotEmpty())
+        
+        // Verify file created
+        val file = File(filesDir, "remote_logger_device_id")
+        assertTrue(file.exists())
+        assertEquals(deviceId, file.readText())
     }
 
     @Test
-    fun `getDeviceId returns android id when available`() {
-        mockkStatic(Settings.Secure::class)
-        every { 
-            Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) 
-        } returns "test-android-id"
+    fun `getDeviceId reads existing ID from file`() {
+        val file = File(filesDir, "remote_logger_device_id")
+        file.writeText("existing-uuid-123")
 
         val deviceId = deviceInfoProvider.getDeviceId()
 
-        assertEquals("test-android-id", deviceId)
-    }
-
-    @Test
-    fun `getDeviceId returns unknown_android when null`() {
-        mockkStatic(Settings.Secure::class)
-        every { 
-            Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) 
-        } returns null
-
-        val deviceId = deviceInfoProvider.getDeviceId()
-
-        assertEquals("unknown_android", deviceId)
+        assertEquals("existing-uuid-123", deviceId)
     }
 }

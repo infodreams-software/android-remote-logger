@@ -1,5 +1,7 @@
 ## 0.1.1
 * **Docs**: Updated documentation to reflect cross-platform consistency.
+
+* **Refactor**: Switched to file-based UUID for Device ID to match Flutter implementation and remove system dependency.
 * **Tests**: Added initial unit verification for `DeviceInfoProvider` using JUnit and MockK.
 
 ## 0.1.0

@@ -8,7 +8,7 @@ A robust **Remote Logging** library for Native Android applications (Kotlin/Java
 
 *   **Session-based Logging**: Every app launch creates a unique Session ID.
 *   **Automatic Metadata**: Captures Device Model, Brand, SDK Version, etc. automatically.
-*   **Persistent Device ID**: Uses `Settings.Secure.ANDROID_ID` to ensure a consistent ID across app reinstalls.
+*   **Persistent Device ID**: Uses a file-based UUID to ensure consistency with the Flutter implementation. Persists across restarts but resets on uninstall.
 *   **Nested Remote Paths**: Supports uploading logs to custom nested folder structures (e.g. `project_name/v1.0/`).
 *   **Local Buffering**: Logs are written to secure local storage (`.jsonl` files) ensuring no data loss on crashes.
 *   **Backend Agnostic**: Comes with built-in uploaders for **Firebase** and **Supabase**.
