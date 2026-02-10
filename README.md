@@ -170,3 +170,17 @@ RemoteLogger.instance.identifyUser("user-uuid-123")
 ```kotlin
 RemoteLogger.instance.uploadCurrentSession()
 ```
+
+### Upload Retry Behavior
+
+The logger implements **automatic retry with exponential backoff** for failed uploads:
+
+1. **Immediate retry**: If an upload fails (network error, server error, etc.), the logger automatically schedules a retry
+2. **Exponential backoff**: Retries happen at increasing intervals:
+   - 1st retry: after **1 minute**
+   - 2nd retry: after **5 minutes**
+   - 3rd retry: after **15 minutes**
+3. **Persistence**: After 3 failed attempts, the log file remains on disk and will be uploaded on the next app launch via `processOldSessions()`
+4. **No data loss**: Log files are **never deleted** until successfully uploaded
+
+This ensures robust delivery even in poor network conditions or temporary server outages.

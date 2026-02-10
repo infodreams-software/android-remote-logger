@@ -34,6 +34,14 @@ class RemoteLogger private constructor() {
 
     private var uploadTimer: java.util.Timer? = null
     private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+    
+    private var retryJob: kotlinx.coroutines.Job? = null
+    private var retryAttempts = 0
+    private val retryDelays = listOf(
+        60_000L,      // 1 minute
+        300_000L,     // 5 minutes
+        900_000L      // 15 minutes
+    )
 
     fun initialize(
         context: Context,
@@ -188,6 +196,17 @@ class RemoteLogger private constructor() {
         storage?.write(entry)
     }
 
+    /**
+     * Uploads the current session log file.
+     * 
+     * If the upload fails, it will automatically retry with exponential backoff:
+     * - 1st retry after 1 minute
+     * - 2nd retry after 5 minutes
+     * - 3rd retry after 15 minutes
+     * 
+     * After 3 failed attempts, the file remains on disk and will be retried
+     * on the next app launch via [processOldSessions].
+     */
     fun uploadCurrentSession() {
         if (!isInitialized || !isEnabled || currentSession == null) return
 
@@ -197,11 +216,39 @@ class RemoteLogger private constructor() {
                 if (file != null && file.exists()) {
                     uploader?.uploadSession(file, currentSession!!, remotePath)
                     notifyEvent(RemoteLoggerEvent.Success("Session uploaded successfully", file.absolutePath))
+                    // Reset retry state on success
+                    retryAttempts = 0
+                    retryJob?.cancel()
+                    retryJob = null
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to upload session", e)
                 notifyEvent(RemoteLoggerEvent.Error("Failed to upload session", e))
+                
+                // Schedule retry with exponential backoff
+                scheduleRetry()
             }
+        }
+    }
+    
+    /**
+     * Schedules a retry attempt with exponential backoff.
+     */
+    private fun scheduleRetry() {
+        if (retryAttempts >= retryDelays.size) {
+            Log.w(TAG, "Max retry attempts reached. File will be uploaded on next app launch.")
+            return
+        }
+
+        val delay = retryDelays[retryAttempts]
+        retryAttempts++
+
+        Log.i(TAG, "Scheduling retry attempt $retryAttempts in ${delay / 60_000} minute(s)")
+
+        retryJob?.cancel()
+        retryJob = scope.launch {
+            kotlinx.coroutines.delay(delay)
+            uploadCurrentSession()
         }
     }
     
@@ -231,6 +278,9 @@ class RemoteLogger private constructor() {
     fun reset() {
         uploadTimer?.cancel()
         uploadTimer = null
+        retryJob?.cancel()
+        retryJob = null
+        retryAttempts = 0
         isInitialized = false
         currentSession = null
         storage = null
