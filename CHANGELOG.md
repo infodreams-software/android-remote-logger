@@ -1,3 +1,8 @@
+## 0.1.2
+* **Fix**: Updated Supabase SQL schema in README to include missing columns (`app_version`, `os_version`, `device_model`) that are referenced in `SupabaseLogUploader` but were not in the original CREATE TABLE statement.
+* **Docs**: Expanded Supabase configuration section with complete SQL setup script, matching Flutter package documentation.
+* **Docs**: Added migration SQL for existing databases to add the missing columns.
+
 ## 0.1.1
 * **Docs**: Updated documentation to reflect cross-platform consistency.
 

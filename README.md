@@ -41,9 +41,74 @@ dependencies {
 
 #### Option B: Supabase
 
-1.  Add `supabasekt` dependencies.
-2.  Initialize Supabase Client.
-3.  Configure Buckets/Tables (see Flutter README or SQL schema).
+To use Supabase, you need to set up your project with the required tables and storage bucket.
+
+1.  **Dependencies**: Add `supabasekt` dependencies to your `build.gradle`.
+2.  **Run Setup SQL**: Login to your Supabase Dashboard, go to the **SQL Editor**, and run the following script to create the necessary tables and buckets:
+
+```sql
+-- 1. Create Storage Bucket for logs
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('remote_logs', 'remote_logs', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Policy to allow uploading logs (Adjust capabilities as needed)
+CREATE POLICY "Allow public uploads" ON storage.objects
+FOR INSERT WITH CHECK ( bucket_id = 'remote_logs' );
+
+CREATE POLICY "Allow public reads" ON storage.objects
+FOR SELECT USING ( bucket_id = 'remote_logs' );
+
+-- 2. Create Sessions Table
+CREATE TABLE IF NOT EXISTS public.remote_log_sessions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    session_id TEXT NOT NULL UNIQUE,
+    device_id TEXT NOT NULL,
+    start_time TIMESTAMP WITH TIME ZONE,
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    user_id TEXT,
+    app_version TEXT,
+    os_version TEXT,
+    device_model TEXT,
+    log_file_url TEXT,
+    custom_data JSONB DEFAULT '{}'::jsonb
+);
+
+-- 3. Create Device Links Table (for User Identity)
+CREATE TABLE IF NOT EXISTS public.remote_log_device_links (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    device_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    linked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 4. Migration for Existing Databases (if remote_log_sessions already exists)
+-- Run this ONLY if you already have the table and need to add the missing columns:
+ALTER TABLE public.remote_log_sessions
+ADD COLUMN IF NOT EXISTS app_version TEXT,
+ADD COLUMN IF NOT EXISTS os_version TEXT,
+ADD COLUMN IF NOT EXISTS device_model TEXT;
+
+-- 5. Enable RLS (Security)
+ALTER TABLE public.remote_log_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.remote_log_device_links ENABLE ROW LEVEL SECURITY;
+
+-- 6. Create Open Policies (⚠️ FAST SETUP ONLY - Restrict in Production!)
+-- These policies allow anyone (even unauthenticated) to insert logs.
+CREATE POLICY "Enable insert for all" ON public.remote_log_sessions
+FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Enable select for all" ON public.remote_log_sessions
+FOR SELECT USING (true);
+
+CREATE POLICY "Enable insert for all" ON public.remote_log_device_links
+FOR INSERT WITH CHECK (true);
+```
+
+3.  **Reload Schema Cache**: After running the SQL, execute this command to ensure the API knows about the new tables:
+    ```sql
+    NOTIFY pgrst, 'reload config';
+    ```
 
 ## Usage
 
