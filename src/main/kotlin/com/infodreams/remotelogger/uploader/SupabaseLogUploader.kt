@@ -35,10 +35,11 @@ class SupabaseLogUploader(
 
 
     override suspend fun uploadSession(logFile: File, sessionInfo: SessionInfo, path: String?) {
+        val suffix = if (sessionInfo.groupSessionId != null) "_${sessionInfo.groupSessionId}" else ""
+        val pathPrefix = if (path != null) "$path/" else ""
+        val fileName = "$pathPrefix${sessionInfo.deviceId}/log_${sessionInfo.sessionId}$suffix.android.jsonl"
+        
         try {
-            val suffix = if (sessionInfo.groupSessionId != null) "_${sessionInfo.groupSessionId}" else ""
-            val pathPrefix = if (path != null) "$path/" else ""
-            val fileName = "$pathPrefix${sessionInfo.deviceId}/log_${sessionInfo.sessionId}$suffix.android.jsonl"
             val bucket = supabase.storage.from(storageBucket)
             
             bucket.upload(fileName, logFile.readBytes(), upsert = true)
@@ -62,12 +63,11 @@ class SupabaseLogUploader(
                 put("custom_data", metadataJson)
             }
 
-            supabase.postgrest.from(sessionsTable).upsert(row) {
-                // Force return type to avoid Any serialization issues?
-                // Actually upsert just takes the object.
-            }
+            supabase.postgrest.from(sessionsTable).upsert(row)
         } catch (e: Exception) {
-            android.util.Log.e("SupabaseLogUploader", "Upload failed for session ${sessionInfo.sessionId}: ${e.message}", e)
+            // Re-throw with better context for debugging
+            android.util.Log.e("SupabaseLogUploader", "Failed to upload session ${sessionInfo.sessionId}: ${e.message}", e)
+            throw Exception("Failed to upload session ${sessionInfo.sessionId} to Supabase: ${e.message}", e)
         }
     }
 

@@ -24,6 +24,9 @@ class RemoteLogger private constructor() {
     private var currentSession: SessionInfo? = null
     private var isInitialized = false
     private var isEnabled = true
+    private var isInitialized = false
+    private var isEnabled = true
+    private var enableConsoleLog = false
     private var eventListener: ((RemoteLoggerEvent) -> Unit)? = null
     private var remotePath: String? = null
 
@@ -48,6 +51,7 @@ class RemoteLogger private constructor() {
         sessionId: String? = null,
         uploader: LogUploader? = null,
         isEnabled: Boolean = true,
+        enableConsoleLog: Boolean = false,
         groupSessionId: String? = null,
         autoUploadIntervalMillis: Long? = null,
         remotePath: String? = null
@@ -55,6 +59,7 @@ class RemoteLogger private constructor() {
         if (isInitialized) return
 
         this.isEnabled = isEnabled
+        this.enableConsoleLog = enableConsoleLog
         if (!isEnabled) {
             Log.i(TAG, "RemoteLogger disabled.")
             isInitialized = true
@@ -125,19 +130,19 @@ class RemoteLogger private constructor() {
     private suspend fun processOldSessions() {
         if (currentSession == null || storage == null || uploader == null) return
 
-        try {
-            val oldFiles = storage!!.getOldSessionFiles(currentSession!!.sessionId)
-            for (file in oldFiles) {
+        val oldFiles = storage!!.getOldSessionFiles(currentSession!!.sessionId)
+        for (file in oldFiles) {
+            try {
                 Log.i(TAG, "Uploading found orphan session: ${file.path}")
                 
-                 val filename = file.name
-                 // clean up filename to extract simpler session id if possible, 
-                 // though SessionInfo mostly needs sessionId for unique ID.
-                 // log_XYZ_android.jsonl -> XYZ
-                 val sessionId = filename
-                     .replace("log_", "")
-                     .replace(".android.jsonl", "")
-                     .replace(Regex("_.*"), "") // Remove group suffix if present
+                val filename = file.name
+                // clean up filename to extract simpler session id if possible, 
+                // though SessionInfo mostly needs sessionId for unique ID.
+                // log_XYZ_android.jsonl -> XYZ
+                val sessionId = filename
+                    .replace("log_", "")
+                    .replace(".android.jsonl", "")
+                    .replace(Regex("_.*"), "") // Remove group suffix if present
 
                 val recoveredSession = SessionInfo(
                     sessionId = sessionId,
@@ -147,17 +152,19 @@ class RemoteLogger private constructor() {
                     userId = currentSession!!.userId
                 )
 
-                try {
-                    uploader!!.uploadSession(file, recoveredSession, remotePath)
-                    // Now that upload is done (suspend), we can safely delete
-                    file.delete()
-                    notifyEvent(RemoteLoggerEvent.Success("Orphan session uploaded: $sessionId"))
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to upload orphan session: ${file.name}", e)
-                }
+                uploader!!.uploadSession(file, recoveredSession, remotePath)
+                
+                // Only delete after successful upload to avoid data loss
+                file.delete()
+                
+                Log.i(TAG, "Successfully uploaded and deleted orphan session: $sessionId")
+                notifyEvent(RemoteLoggerEvent.Success("Orphan session uploaded: $sessionId"))
+            } catch (e: Exception) {
+                // Log error for this specific file but continue processing others
+                Log.e(TAG, "Failed to upload orphan session: ${file.name}", e)
+                notifyEvent(RemoteLoggerEvent.Error("Failed to upload orphan session: ${file.name}", e))
+                // Continue with next file
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to process old sessions", e)
         }
     }
 
@@ -194,6 +201,15 @@ class RemoteLogger private constructor() {
         )
 
         storage?.write(entry)
+        
+        if (enableConsoleLog) {
+            when (level.uppercase()) {
+                "ERROR" -> Log.e(tag, message)
+                "WARNING", "WARN" -> Log.w(tag, message)
+                "DEBUG" -> Log.d(tag, message)
+                else -> Log.i(tag, message)
+            }
+        }
     }
 
     /**

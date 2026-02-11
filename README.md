@@ -103,6 +103,10 @@ FOR SELECT USING (true);
 
 CREATE POLICY "Enable insert for all" ON public.remote_log_device_links
 FOR INSERT WITH CHECK (true);
+
+-- Allow updating sessions (required for upsert operations)
+CREATE POLICY "Enable update for all" ON public.remote_log_sessions
+FOR UPDATE USING (true) WITH CHECK (true);
 ```
 
 3.  **Reload Schema Cache**: After running the SQL, execute this command to ensure the API knows about the new tables:
@@ -127,8 +131,9 @@ val supabase = createSupabaseClient(url, key) { ... }
 
 RemoteLogger.instance.initialize(
     context = this,
-    uploader = SupabaseLogUploader(supabase),
-    autoUploadIntervalMillis = 5 * 60 * 1000, // 5 minutes
+    uploader = SupabaseLogUploader(supabase), // or FirebaseLogUploader()
+    autoUploadIntervalMillis = 5 * 60 * 1000, // Optional: 5 minutes
+    enableConsoleLog = BuildConfig.DEBUG, // Optional: print logs to Logcat in debug builds
     remotePath = "my_project/v1.0" // Optional: Nested folder path
 )
 ```
